@@ -61,7 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
       value: 45,
       type: "slider",
       color: "#e74c3c",
-      text: "Angle:",
+      text: "Winkel:",
       disabled: false,
     },
     player1PowerSlider: {
@@ -75,7 +75,7 @@ document.addEventListener("DOMContentLoaded", () => {
       value: 50,
       type: "slider",
       color: "#e74c3c",
-      text: "Power:",
+      text: "Kraft:",
       disabled: false,
     },
 
@@ -91,7 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
       value: 45,
       type: "slider",
       color: "#3498db",
-      text: "Angle:",
+      text: "Winkel:",
       disabled: false,
     },
     player2PowerSlider: {
@@ -105,7 +105,7 @@ document.addEventListener("DOMContentLoaded", () => {
       value: 50,
       type: "slider",
       color: "#3498db",
-      text: "Power:",
+      text: "Kraft:",
       disabled: false,
     },
 
@@ -116,7 +116,7 @@ document.addEventListener("DOMContentLoaded", () => {
       y: canvas.height - 90,
       width: BUTTON_WIDTH,
       height: BUTTON_HEIGHT,
-      text: "FIRE!",
+      text: "FEUER!",
       color: "#e74c3c",
       type: "button",
       disabled: false,
@@ -134,7 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
       value: 70,
       type: "slider",
       color: "#f39c12",
-      text: "Distance:",
+      text: "Distanz:",
       disabled: false,
     },
     terrainHeightSlider: {
@@ -148,7 +148,7 @@ document.addEventListener("DOMContentLoaded", () => {
       value: 15,
       type: "slider",
       color: "#f39c12",
-      text: "Hilliness:",
+      text: "Hügeligkeit:",
       disabled: false,
     },
 
@@ -519,9 +519,9 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.textAlign = "right";
     ctx.fillText(
       slider.value +
-        (slider.text.includes("Angle")
+        (slider.text.includes("Winkel")
           ? "°"
-          : slider.text.includes("Distance")
+          : slider.text.includes("Distanz")
             ? "%"
             : ""),
       slider.x + slider.width,
@@ -589,7 +589,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.textBaseline = "top"; // Keep textBaseline as top
     // Use textY for the text
     ctx.fillText(
-      `Player ${healthBar.color === "#e74c3c" ? "1 (Red)" : "2 (Blue)"}`,
+      `Spieler ${healthBar.color === "#e74c3c" ? "1 (Rot)" : "2 (Blau)"}`,
       healthBar.x + healthBar.width / 2,
       healthBar.textY, // Draw text at textY
     );
@@ -617,7 +617,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.font = `bold ${INFO_TEXT_SIZE}px Arial`;
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    ctx.fillText("Game Setup", canvas.width / 2, canvas.height - 70);
+    ctx.fillText("Spielaufbau", canvas.width / 2, canvas.height - 70);
     drawSlider(uiElements.playerDistanceSlider);
     drawSlider(uiElements.terrainHeightSlider);
 
@@ -701,7 +701,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- Update visual values for UI elements (Health Bars, Turn Indicator) ---
     uiElements.player1HealthBar.value = players[0].health;
     uiElements.player2HealthBar.value = players[1].health;
-    uiElements.turnIndicator.text = `${currentPlayer.id === 1 ? "Player 1 (Red)" : "Player 2 (Blue)"}'s Turn`;
+    uiElements.turnIndicator.text = `${currentPlayer.id === 1 ? "Spieler 1 (Rot)" : "Spieler 2 (Blau)"} ist dran`;
   }
 
   function fireProjectile() {
@@ -817,7 +817,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (winner) {
       gameOver = true;
-      gameOverMessage.textContent = `${winner.id === 1 ? "Player 1 (Red)" : "Player 2 (Blue)"} Wins!`;
+      gameOverMessage.textContent = `${winner.id === 1 ? "Spieler 1 (Rot)" : "Spieler 2 (Blau)"} gewinnt!`;
       gameOverScreen.style.display = "flex";
       // updateUIState() will be called by gameLoop, no explicit call here
     }
