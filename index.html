@@ -3,16 +3,25 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Bowmasters</title>
+        <title>Bowmasters-Lite: Canvas Only</title>
         <link rel="stylesheet" href="style.css" />
     </head>
     <body>
         <!-- The canvas is now the main game area -->
         <canvas id="gameCanvas" width="900" height="600"></canvas>
+
+        <!-- Game Setup Controls (now HTML inputs) -->
+        <div id="gameSetupControls">
+            <label for="playerDistance">Player Distance (%):</label>
+            <input type="text" id="playerDistance" value="70" size="5" />
+            <label for="terrainHilliness">Terrain Hilliness (px):</label>
+            <input type="text" id="terrainHilliness" value="15" size="5" />
+        </div>
+
         <!-- Game over screen remains as an HTML overlay for simplicity -->
         <div id="gameOverScreen" class="game-over-screen">
             <h2 id="gameOverMessage"></h2>
-            <button id="restartButton">Noch mal spielen?</button>
+            <button id="restartButton">Play Again?</button>
         </div>
 
         <script src="script.js"></script>
