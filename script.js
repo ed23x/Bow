@@ -17,11 +17,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const LEG_LENGTH = 15;
   const PLAYER_DRAW_OFFSET = 5; // How much above the terrain the "feet" are drawn (to avoid being in terrain)
 
-  // Damage constants
+  // Damage constants (Note: Damage amounts are independent of projectile type for simplicity)
   const DAMAGE_HEAD = 40;
   const DAMAGE_BODY = 25;
   const DAMAGE_LEGS = 15;
-  const PROJECTILE_RADIUS_FOR_HIT = 5; // Radius of the projectile for collision calculation
 
   // Knockback constants
   const KNOCKBACK_POWER_MULTIPLIER = 0.8;
@@ -47,6 +46,91 @@ document.addEventListener("DOMContentLoaded", () => {
   const HEALTH_BAR_HEIGHT = 20;
   const HEALTH_BAR_VERTICAL_MARGIN = 5; // Margin between the player name text and the health bar
 
+  // --- Projectile Definitions ---
+  const PROJECTILE_TYPES = [
+    {
+      type: "arrow",
+      radius: 5,
+      draw: (ctx, proj) => {
+        // Arrow drawing logic using projectile properties
+        ctx.fillStyle = "#7f8c8d";
+        ctx.strokeStyle = "#555";
+        ctx.lineWidth = 1;
+        const arrowLength = 15;
+        const headLength = 7;
+        const headWidth = 5;
+        const angle = Math.atan2(proj.vy, proj.vx); // Use projectile's velocity
+
+        ctx.save();
+        ctx.translate(proj.x, proj.y); // Translate to projectile's position
+        ctx.rotate(angle);
+
+        ctx.beginPath();
+        ctx.moveTo(-arrowLength / 2, 0);
+        ctx.lineTo(arrowLength / 2, 0);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(arrowLength / 2, 0);
+        ctx.lineTo(arrowLength / 2 - headLength, -headWidth / 2);
+        ctx.lineTo(arrowLength / 2 - headLength, headWidth / 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.restore();
+      },
+    },
+    {
+      type: "bomb",
+      radius: 8,
+      draw: (ctx, proj) => {
+        ctx.fillStyle = "#34495e"; // Dark grey/black
+        ctx.beginPath();
+        ctx.arc(proj.x, proj.y, proj.radius, 0, Math.PI * 2);
+        ctx.fill();
+        // Optional: add a small fuse visually
+        ctx.strokeStyle = "#f1c40f"; // Yellow/orange fuse
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(proj.x + proj.radius * 0.7, proj.y - proj.radius * 0.7);
+        ctx.lineTo(proj.x + proj.radius * 1.2, proj.y - proj.radius * 1.2);
+        ctx.stroke();
+      },
+    },
+    {
+      type: "watermelon",
+      radius: 7,
+      draw: (ctx, proj) => {
+        // Outer green rind
+        ctx.fillStyle = "#2ecc71"; // Green
+        ctx.beginPath();
+        ctx.arc(proj.x, proj.y, proj.radius, 0, Math.PI * 2);
+        ctx.fill();
+        // Inner red
+        ctx.fillStyle = "#e74c3c"; // Red
+        ctx.beginPath();
+        ctx.arc(proj.x, proj.y, proj.radius * 0.7, 0, Math.PI * 2); // Smaller red part
+        ctx.fill();
+        // Optional: add black seeds
+        ctx.fillStyle = "#000";
+        ctx.fillRect(
+          proj.x - proj.radius * 0.3,
+          proj.y - proj.radius * 0.3,
+          2,
+          2,
+        );
+        ctx.fillRect(
+          proj.x + proj.radius * 0.3,
+          proj.y - proj.radius * 0.3,
+          2,
+          2,
+        );
+        ctx.fillRect(proj.x, proj.y + proj.radius * 0.3, 2, 2);
+      },
+    },
+  ];
+
   // Define properties for drawing and interacting with UI elements
   let uiElements = {
     // Player 1 Controls
@@ -61,7 +145,7 @@ document.addEventListener("DOMContentLoaded", () => {
       value: 45,
       type: "slider",
       color: "#e74c3c",
-      text: "Winkel:",
+      text: "Angle:",
       disabled: false,
     },
     player1PowerSlider: {
@@ -75,7 +159,7 @@ document.addEventListener("DOMContentLoaded", () => {
       value: 50,
       type: "slider",
       color: "#e74c3c",
-      text: "Kraft:",
+      text: "Power:",
       disabled: false,
     },
 
@@ -91,7 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
       value: 45,
       type: "slider",
       color: "#3498db",
-      text: "Winkel:",
+      text: "Angle:",
       disabled: false,
     },
     player2PowerSlider: {
@@ -105,7 +189,7 @@ document.addEventListener("DOMContentLoaded", () => {
       value: 50,
       type: "slider",
       color: "#3498db",
-      text: "Kraft:",
+      text: "Power:",
       disabled: false,
     },
 
@@ -116,7 +200,7 @@ document.addEventListener("DOMContentLoaded", () => {
       y: canvas.height - 90,
       width: BUTTON_WIDTH,
       height: BUTTON_HEIGHT,
-      text: "FEUER!",
+      text: "FIRE!",
       color: "#e74c3c",
       type: "button",
       disabled: false,
@@ -134,7 +218,7 @@ document.addEventListener("DOMContentLoaded", () => {
       value: 70,
       type: "slider",
       color: "#f39c12",
-      text: "Distanz:",
+      text: "Distance:",
       disabled: false,
     },
     terrainHeightSlider: {
@@ -148,7 +232,7 @@ document.addEventListener("DOMContentLoaded", () => {
       value: 15,
       type: "slider",
       color: "#f39c12",
-      text: "Hügeligkeit:",
+      text: "Hilliness:",
       disabled: false,
     },
 
@@ -212,10 +296,10 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentTerrainMaxHeightChange = uiElements.terrainHeightSlider.value;
   let currentPlayerDistancePercent = uiElements.playerDistanceSlider.value;
 
-  // Mouse interaction variables (FIX: Declared only once here)
+  // Mouse interaction variables
   let isDragging = false;
-  let selectedSlider = null; // Reference to the slider object being dragged
-  let mouse = { x: 0, y: 0 }; // Keep track of mouse position
+  let selectedSlider = null;
+  let mouse = { x: 0, y: 0 };
 
   // --- Player Class ---
   class Player {
@@ -283,7 +367,7 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.lineTo(this.x + HEAD_RADIUS, this.base_y - PLAYER_DRAW_OFFSET);
       ctx.stroke();
 
-      // Cannon/Arm
+      // Cannon/Arm - Draw always to show aiming angle
       ctx.strokeStyle = "rgba(0,0,0,0.5)";
       ctx.lineWidth = 5;
       ctx.beginPath();
@@ -409,38 +493,10 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.fill();
   }
 
-  function drawArrow(x, y, vx, vy) {
-    ctx.fillStyle = "#7f8c8d";
-    ctx.strokeStyle = "#555";
-    ctx.lineWidth = 1;
-    const arrowLength = 15;
-    const headLength = 7;
-    const headWidth = 5;
-    const angle = Math.atan2(vy, vx);
-
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(angle);
-
-    ctx.beginPath();
-    ctx.moveTo(-arrowLength / 2, 0);
-    ctx.lineTo(arrowLength / 2, 0);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(arrowLength / 2, 0);
-    ctx.lineTo(arrowLength / 2 - headLength, -headWidth / 2);
-    ctx.lineTo(arrowLength / 2 - headLength, headWidth / 2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.restore();
-  }
-
   function drawProjectile() {
     if (!projectile || !projectile.active) return;
-    drawArrow(projectile.x, projectile.y, projectile.vx, projectile.vy);
+    // Call the draw function specific to the projectile type
+    projectile.draw(ctx, projectile);
   }
 
   function drawTrajectory() {
@@ -519,9 +575,9 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.textAlign = "right";
     ctx.fillText(
       slider.value +
-        (slider.text.includes("Winkel")
+        (slider.text.includes("Angle")
           ? "°"
-          : slider.text.includes("Distanz")
+          : slider.text.includes("Distance")
             ? "%"
             : ""),
       slider.x + slider.width,
@@ -589,7 +645,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.textBaseline = "top"; // Keep textBaseline as top
     // Use textY for the text
     ctx.fillText(
-      `Spieler ${healthBar.color === "#e74c3c" ? "1 (Rot)" : "2 (Blau)"}`,
+      `Player ${healthBar.color === "#e74c3c" ? "1 (Red)" : "2 (Blue)"}`,
       healthBar.x + healthBar.width / 2,
       healthBar.textY, // Draw text at textY
     );
@@ -617,7 +673,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.font = `bold ${INFO_TEXT_SIZE}px Arial`;
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    ctx.fillText("Spielaufbau", canvas.width / 2, canvas.height - 70);
+    ctx.fillText("Game Setup", canvas.width / 2, canvas.height - 70);
     drawSlider(uiElements.playerDistanceSlider);
     drawSlider(uiElements.terrainHeightSlider);
 
@@ -701,7 +757,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- Update visual values for UI elements (Health Bars, Turn Indicator) ---
     uiElements.player1HealthBar.value = players[0].health;
     uiElements.player2HealthBar.value = players[1].health;
-    uiElements.turnIndicator.text = `${currentPlayer.id === 1 ? "Spieler 1 (Rot)" : "Spieler 2 (Blau)"} ist dran`;
+    uiElements.turnIndicator.text = `${currentPlayer.id === 1 ? "Player 1 (Red)" : "Player 2 (Blue)"}'s Turn`;
   }
 
   function fireProjectile() {
@@ -715,6 +771,10 @@ document.addEventListener("DOMContentLoaded", () => {
       Math.cos(angle) * power * POWER_MULTIPLIER * player.direction;
     const initialVy = -Math.sin(angle) * power * POWER_MULTIPLIER;
 
+    // Select a random projectile type
+    const randomProjectileType =
+      PROJECTILE_TYPES[Math.floor(Math.random() * PROJECTILE_TYPES.length)];
+
     projectile = {
       x: player.x,
       y: player.headY + HEAD_RADIUS / 2,
@@ -722,6 +782,10 @@ document.addEventListener("DOMContentLoaded", () => {
       vy: initialVy,
       active: true,
       firedPower: power,
+      // Assign properties from the selected type
+      type: randomProjectileType.type,
+      radius: randomProjectileType.radius,
+      draw: randomProjectileType.draw, // Assign the specific draw function
     };
     gameActive = true;
     // updateUIState() called by gameLoop
@@ -736,8 +800,10 @@ document.addEventListener("DOMContentLoaded", () => {
     projectile.vx += currentWind;
 
     const terrainAtProjectileX = findTerrainY(projectile.x);
-    if (projectile.y >= terrainAtProjectileX) {
-      projectile.y = terrainAtProjectileX;
+    // Use projectile.radius for terrain collision
+    if (projectile.y + projectile.radius >= terrainAtProjectileX) {
+      // Adjusted collision point
+      projectile.y = terrainAtTerrainX - projectile.radius; // Adjusted final position above terrain
       projectile.active = false;
       endTurn();
       return;
@@ -749,11 +815,13 @@ document.addEventListener("DOMContentLoaded", () => {
     let hitDamage = 0;
     let hitPart = null;
 
+    // Use projectile.radius for player collision checks
     const distHead = Math.sqrt(
       Math.pow(projectile.x - opponent.x, 2) +
         Math.pow(projectile.y - opponent.headY, 2),
     );
-    if (distHead < HEAD_RADIUS + PROJECTILE_RADIUS_FOR_HIT) {
+    if (distHead < HEAD_RADIUS + projectile.radius) {
+      // Use projectile.radius
       hitDamage = DAMAGE_HEAD;
       hitPart = "head";
     } else {
@@ -761,7 +829,8 @@ document.addEventListener("DOMContentLoaded", () => {
         Math.pow(projectile.x - opponent.x, 2) +
           Math.pow(projectile.y - opponent.bodyY, 2),
       );
-      if (distBody < BODY_HEIGHT / 2 + PROJECTILE_RADIUS_FOR_HIT) {
+      if (distBody < BODY_HEIGHT / 2 + projectile.radius) {
+        // Use projectile.radius
         hitDamage = DAMAGE_BODY;
         hitPart = "body";
       } else {
@@ -769,7 +838,8 @@ document.addEventListener("DOMContentLoaded", () => {
           Math.pow(projectile.x - opponent.x, 2) +
             Math.pow(projectile.y - opponent.legsY, 2),
         );
-        if (distLegs < LEG_LENGTH / 2 + PROJECTILE_RADIUS_FOR_HIT) {
+        if (distLegs < LEG_LENGTH / 2 + projectile.radius) {
+          // Use projectile.radius
           hitDamage = DAMAGE_LEGS;
           hitPart = "legs";
         }
@@ -785,7 +855,12 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    if (projectile.x < -100 || projectile.x > canvas.width + 100) {
+    // Projectile off-screen check - adjusted bounds slightly based on radius
+    if (
+      projectile.x < -projectile.radius * 2 ||
+      projectile.x > canvas.width + projectile.radius * 2
+    ) {
+      // Use projectile.radius
       projectile.active = false;
       endTurn();
       return;
@@ -817,7 +892,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (winner) {
       gameOver = true;
-      gameOverMessage.textContent = `${winner.id === 1 ? "Spieler 1 (Rot)" : "Spieler 2 (Blau)"} gewinnt!`;
+      gameOverMessage.textContent = `${winner.id === 1 ? "Player 1 (Red)" : "Player 2 (Blue)"} Wins!`;
       gameOverScreen.style.display = "flex";
       // updateUIState() will be called by gameLoop, no explicit call here
     }
@@ -846,7 +921,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- Canvas Mouse Event Handlers ---
-  // (FIX: 'mouse', 'isDragging', 'selectedSlider' are now declared globally at the top)
 
   // Helper to get mouse position corrected for canvas scaling
   function getMousePos(event) {
